@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2d7ff9">
+<title>阅读缓存转 TXT</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --line:#e4e7ec; --txt:#1f2329; --sub:#646a73;
+    --blue:#2d7ff9; --blue-d:#1a6ce0; --ok:#0f9d58; --warn:#c77700; --err:#d93026;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;padding:16px 14px calc(32px + env(safe-area-inset-bottom));
+    background:var(--bg);color:var(--txt);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif;
+  }
+  .wrap{max-width:720px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:600;letter-spacing:.02em}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;
+        background:var(--blue);color:#fff;border-radius:50%;font-size:12px;margin-right:6px}
+  .drop{
+    border:2px dashed #c3cbdc;border-radius:10px;padding:22px 14px;text-align:center;
+    color:var(--sub);background:#fbfcfe;transition:.15s;cursor:pointer;
+  }
+  .drop.on{border-color:var(--blue);background:#eef5ff;color:var(--blue)}
+  .drop b{color:var(--blue);font-weight:600}
+  .picked{margin-top:10px;font-size:13px;color:var(--txt);word-break:break-all}
+  .picked .tag{display:inline-block;background:#eef5ff;color:var(--blue-d);border-radius:6px;
+               padding:2px 8px;margin:3px 6px 3px 0;font-size:12px}
+  label.row{display:block;margin:10px 0 0;font-size:13px;color:var(--sub)}
+  input[type=text],textarea{
+    width:100%;margin-top:5px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    font:inherit;font-size:14px;background:#fbfcfe;color:var(--txt);
+  }
+  textarea{min-height:88px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:520px){.grid{grid-template-columns:1fr}}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px}
+  .chk input{width:18px;height:18px}
+  button{
+    font:inherit;border:0;border-radius:10px;padding:13px 18px;cursor:pointer;
+    background:var(--blue);color:#fff;font-weight:600;width:100%;
+  }
+  button:active{background:var(--blue-d)}
+  button:disabled{background:#b9c4d6;cursor:not-allowed}
+  button.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue);width:auto;padding:9px 14px;font-size:13px}
+  details{margin-top:10px}
+  summary{cursor:pointer;color:var(--blue);font-size:13px;padding:4px 0}
+  #log{
+    display:none;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Consolas,monospace;
+    font-size:12.5px;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;
+    padding:10px;max-height:210px;overflow:auto;margin-top:10px;
+  }
+  .bar{height:6px;background:#e9edf3;border-radius:3px;overflow:hidden;margin-top:10px;display:none}
+  .bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+  .res{display:none}
+  .res h3{margin:0 0 2px;font-size:15px}
+  .res .meta{color:var(--sub);font-size:13px;margin:0 0 10px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btns button{width:auto;flex:1;min-width:140px}
+  .note{color:var(--sub);font-size:12.5px;margin:10px 0 0}
+  .err{color:var(--err)}
+  .hint{color:var(--sub);font-size:12.5px;margin-top:8px}
+  footer{color:var(--sub);font-size:12px;text-align:center;margin-top:18px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>阅读缓存转 TXT</h1>
+  <p class="lead">把「阅读」(Legado) 的章节缓存压缩包，在手机浏览器里直接转成 txt 小说。全离线，不上传任何文件。</p>
+
+  <!-- 步骤 1 -->
+  <div class="card">
+    <h2><span class="step">1</span>选择缓存压缩包</h2>
+    <div class="drop" id="drop">
+      <div>点击选择 <b>.zip</b> 压缩包</div>
+      <div style="font-size:12.5px;margin-top:4px">电脑上也可以把文件拖到这里</div>
+    </div>
+    <input type="file" id="file" accept=".zip,.nb,application/zip" multiple hidden>
+    <div class="picked" id="picked"></div>
+    <div class="hint" id="cap"></div>
+  </div>
+
+  <!-- 步骤 2 -->
+  <div class="card">
+    <h2><span class="step">2</span>选项（都可以留空）</h2>
+    <div class="grid">
+      <label class="row">书名
+        <input type="text" id="title" placeholder="留空则从文件夹名自动识别">
+      </label>
+      <label class="row">作者
+        <input type="text" id="author" placeholder="可留空">
+      </label>
+    </div>
+    <div class="chk">
+      <input type="checkbox" id="withToc" >
+      <label for="withToc">在文件开头附目录页（默认关闭：阅读器会把正文章节再解析一遍）</label>
+    </div>
+
+    <details>
+      <summary>章节标题清单（可选）—— 没有也能转，标题会显示为「第N章」</summary>
+      <label class="row">选择文件（一行一个标题的 txt / json / 另存的 html）
+        <input type="file" id="tocFile" accept=".txt,.json,.html,.htm,text/plain" style="margin-top:5px;font-size:13px;width:100%">
+      </label>
+      <label class="row">或直接粘贴目录页内容（导航、字数、日期等杂质会自动过滤）
+        <textarea id="tocText" placeholder="第1章 坏了，穿越进电脑里了&#10;第2章 我的帅脸不需要捏&#10;……"></textarea>
+      </label>
+    </details>
+  </div>
+
+  <!-- 步骤 3 -->
+  <div class="card">
+    <h2><span class="step">3</span>转换</h2>
+    <button id="go" disabled>开始转换</button>
+    <div class="bar" id="bar"><i id="barIn"></i></div>
+    <div id="log"></div>
+  </div>
+
+  <div class="card res" id="res">
+    <h2>转换完成</h2>
+    <div id="resBody"></div>
+    <p class="note">下载后如果想把 txt 放回「阅读」里看：把文件移到手机存储，书架 → 菜单 → 本地导入。章节标题是独立成行的，阅读器能自动识别目录。</p>
+  </div>
+
+  <footer>
+    章节标题为「第N章」时不影响阅读，阅读器的目录与进度照常工作。<br>
+    想显示真实标题，复制原书目录页粘进上面的清单框即可。
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   阅读缓存转 TXT —— 单文件离线版
+   转换规则与桌面版 (legado2txt) 完全一致：
+   · 一个 .nb = 一章正文，文件名前导数字是章节序号
+   · 段落统一两个全角空格缩进（注意：JS 的 \s 也包含 U+3000，
+     所以判空用 /\s/ 没问题，但取内容必须用显式字符类，不能 trim）
+   · 章节标题独立成行，开头不放目录列表，来源说明放文末
+   · 输出 UTF-8 with BOM
+   ============================================================ */
+
+const NB_RE    = /^(\d+)(?:-(.*?))?\.nb$/i;
+const HASH_RE  = /[0-9a-f]{16}$/i;
+const TITLE_L  = /^第\s*([0-9]{1,4})\s*章[\s\u3000]*(.*)$/;
+const TITLE_G  = /第\s*([0-9]{1,4})\s*章[\s\u3000]*([^\n\r]{0,40})/g;
+const WSP_L    = /^[\u3000 \t]+/;
+const WSP_R    = /[\u3000 \t]+$/;
+
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+
+/* ---------------- 界面辅助 ---------------- */
+function log(msg){ const el = $('log'); el.style.display = 'block'; el.textContent += msg + '\n'; el.scrollTop = el.scrollHeight; }
+function progress(v){ $('bar').style.display = 'block'; $('barIn').style.width = Math.round(v * 100) + '%'; }
+const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+/* ---------------- zip 解析（原生，无依赖） ---------------- */
+function decodeName(bytes, flag){
+  const utf8 = (flag & 0x800) !== 0;
+  try { return new TextDecoder('utf-8', {fatal: !utf8}).decode(bytes); }
+  catch { try { return new TextDecoder('gbk').decode(bytes); }
+          catch { return new TextDecoder('utf-8').decode(bytes); } }
+}
+
+function listEntries(buf){
+  const dv = new DataView(buf);
+  const min = Math.max(0, buf.byteLength - 65558);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= min; i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('这不像是有效的 zip 压缩包');
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let n = 0; n < count; n++){
+    if (off + 46 > buf.byteLength || dv.getUint32(off, true) !== 0x02014b50) break;
+    const flag   = dv.getUint16(off + 8, true);
+    const method = dv.getUint16(off + 10, true);
+    const csize  = dv.getUint32(off + 20, true);
+    const fnLen  = dv.getUint16(off + 28, true);
+    const exLen  = dv.getUint16(off + 30, true);
+    const cmLen  = dv.getUint16(off + 32, true);
+    const lho    = dv.getUint32(off + 42, true);
+    out.push({ name: decodeName(new Uint8Array(buf, off + 46, fnLen), flag),
+               method, csize, lho });
+    off += 46 + fnLen + exLen + cmLen;
+  }
+  if (!out.length) throw new Error('zip 里没有读到任何文件');
+  return out;
+}
+
+async function readEntry(buf, e){
+  const dv = new DataView(buf);
+  if (dv.getUint32(e.lho, true) !== 0x04034b50) throw new Error('zip 条目损坏：' + e.name);
+  const fnLen = dv.getUint16(e.lho + 26, true);
+  const exLen = dv.getUint16(e.lho + 28, true);
+  const start = e.lho + 30 + fnLen + exLen;
+  const data  = new Uint8Array(buf, start, e.csize);
+  if (e.method === 0) return data;
+  if (e.method !== 8) throw new Error('不支持的压缩方式(' + e.method + ')：' + e.name);
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/* ---------------- 文本清洗（与桌面版同一套规则） ---------------- */
+function fixQuotes(t){
+  if (t.indexOf('"') < 0) return t;
+  let out = '', open = true;
+  for (const ch of t){
+    if (ch === '"'){ out += open ? '\u201c' : '\u201d'; open = !open; }
+    else out += ch;
+  }
+  return out;
+}
+
+function cleanBlock(raw){
+  const lines = String(raw).replace(/\r\n?/g, '\n').split('\n');
+  const keep = [];
+  for (const ln of lines){
+    if (!/\S/.test(ln)) continue;                       // 空行（\s 含 U+3000，正好）
+    keep.push('\u3000\u3000' + ln.replace(WSP_R, '').replace(WSP_L, ''));
+  }
+  return fixQuotes(keep.join('\n'));
+}
+
+/* ---------------- 标题清单 ---------------- */
+function cleanLine(s){
+  s = s.replace(/[\t\u3000]+/g, ' ').trim();
+  s = s.split('|')[0];
+  s = s.replace(/\s{3,}[\s\S]*$/, '');
+  return s.replace(/[\s·]+$/, '');
+}
+
+function extractTitles(raw){
+  const out = [], nums = [], seen = new Set();
+  const add = (num, name) => {
+    name = cleanLine(name);
+    const title = name ? '第' + num + '章 ' + name : '第' + num + '章';
+    if (seen.has(title)) return;
+    seen.add(title); out.push(title); nums.push(num);
+  };
+  for (const ln of String(raw).split('\n')){
+    const m = TITLE_L.exec(cleanLine(ln));
+    if (m) add(Number(m[1]), m[2]);
+  }
+  if (!out.length){
+    let m; TITLE_G.lastIndex = 0;
+    while ((m = TITLE_G.exec(raw))) add(Number(m[1]), m[2]);
+  }
+  if (nums.length >= 3 && nums[0] > nums[nums.length - 1]){   // 目录倒序的站点
+    let desc = 0;
+    for (let i = 1; i < nums.length; i++) if (nums[i - 1] > nums[i]) desc++;
+    if (desc > nums.length / 2) out.reverse();
+  }
+  return out;
+}
+
+function titlesFromObj(obj){
+  if (Array.isArray(obj)){
+    if (obj.length && typeof obj[0] === 'string') return obj.map(s => String(s).trim());
+    return obj.flatMap(titlesFromObj);
+  }
+  if (obj && typeof obj === 'object'){
+    for (const k of ['chapterListWithVolume', 'titles', 'chapters', 'list', 'data']){
+      if (k in obj){ const got = titlesFromObj(obj[k]); if (got.length) return got; }
+    }
+    for (const v of Object.values(obj)){ const got = titlesFromObj(v); if (got.length) return got; }
+  }
+  return [];
+}
+
+function stripHtml(html){
+  return html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(a|li|dd|dt|div|p|h[1-6]|tr|td|span)\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+}
+
+function parseTitles(text, isHtml){
+  let raw = text;
+  if (isHtml || /<a\s/i.test(raw)) raw = stripHtml(raw);
+  let titles = [];
+  const trimmed = raw.replace(/^\uFEFF/, '').trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')){
+    try { titles = titlesFromObj(JSON.parse(trimmed)); } catch (e) { titles = []; }
+  }
+  if (!titles.length) titles = extractTitles(raw);
+  if (!titles.length) titles = raw.split('\n').map(cleanLine).filter(s => s && s[0] !== '#');
+  return titles;
+}
+
+/* ---------------- 章节归集与转换 ---------------- */
+function bookNameFrom(dirName){
+  const base = String(dirName || '').replace(/\/+$/, '').split('/').pop() || '';
+  const name = base.replace(HASH_RE, '').replace(/^[\s\-_()（）]+|[\s\-_()（）]+$/g, '');
+  return name || base || '未命名';
+}
+
+/* 章节排序：先按序号，再按分段号（超长章节会被拆成 {序号}-1.nb） */
+function cmpNb(x, y){
+  const mx = NB_RE.exec(x), my = NB_RE.exec(y);
+  const ix = mx ? +mx[1] : 0, iy = my ? +my[1] : 0;
+  if (ix !== iy) return ix - iy;
+  const part = m => (m && m[2] && m[2].length <= 2 && /^\d+$/.test(m[2])) ? +m[2] : 0;
+  return part(mx) - part(my);
+}
+
+async function unzipToChapters(buf, zipName){
+  const entries = listEntries(buf);
+  const dirs = new Map();
+  for (const e of entries){
+    const base = e.name.split('/').pop();
+    if (!/\.nb$/i.test(base)) continue;
+    const dir = e.name.slice(0, e.name.length - base.length).replace(/\/+$/, '');
+    if (!dirs.has(dir)) dirs.set(dir, []);
+    dirs.get(dir).push(Object.assign({}, e, { base }));
+  }
+  if (!dirs.size) throw new Error('这个 zip 里没有 .nb 章节文件（确认是「阅读」导出的章节缓存）');
+
+  const jobs = [], books = [];
+  for (const [dir, list] of dirs){
+    list.sort((a, b) => cmpNb(a.base, b.base));
+    const book = { dir, name: bookNameFrom(dir), chapters: [] };
+    books.push(book);
+    for (const e of list) jobs.push({ book, entry: e, text: null });
+  }
+
+  // 并发解压：逐个建流开销大，8 路并行在手机上也能几秒跑完
+  const decoder = new TextDecoder('utf-8');
+  const total = jobs.length;
+  let cursor = 0, done = 0;
+  const worker = async () => {
+    for (;;){
+      const i = cursor++;
+      if (i >= total) return;
+      const job = jobs[i];
+      job.text = decoder.decode(await readEntry(buf, job.entry));
+      done++;
+      if (done % 8 === 0 || done === total){ progress(done / total * 0.9); await yieldUI(); }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(8, total)}, worker));
+
+  for (const job of jobs) job.book.chapters.push(cleanBlock(job.text));
+  return books;
+}
+
+/* 无 zip 时：直接把选中的 .nb 文件（或整个文件夹）当作章节 */
+async function filesToChapters(files){
+  const groups = new Map();
+  for (const f of files){
+    if (!/\.nb$/i.test(f.name)) continue;
+    const rel = f.webkitRelativePath || f.name;
+    const dir = rel.split('/').slice(0, -1).join('/');
+    if (!groups.has(dir)) groups.set(dir, []);
+    groups.get(dir).push(f);
+  }
+  if (!groups.size) throw new Error('没有找到 .nb 章节文件');
+
+  const jobs = [], books = [];
+  for (const [dir, list] of groups){
+    list.sort((a, b) => cmpNb(a.name, b.name));
+    const book = { dir, name: bookNameFrom(dir || (list[0].webkitRelativePath || list[0].name)),
+                   chapters: [] };
+    books.push(book);
+    for (const f of list) jobs.push({ book, file: f, text: null });
+  }
+
+  const decoder = new TextDecoder('utf-8');
+  let cursor = 0;
+  const worker = async () => {
+    for (;;){
+      const i = cursor++;
+      if (i >= jobs.length) return;
+      const job = jobs[i];
+      job.text = decoder.decode(await job.file.arrayBuffer());
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(8, jobs.length)}, worker));
+
+  for (const job of jobs) job.book.chapters.push(cleanBlock(job.text));
+  return books;
+}
+
+function buildText(book, titles, opts){
+  const chapters = book.chapters;
+  let offset = 0;
+  if (titles.length > 1){
+    const m = /^第\s*([0-9]{1,4})\s*章/.exec(titles[0]);
+    if (m && +m[1] > 1) offset = +m[1] - 1;             // 清单只拿到一部分时按序号对齐
+  }
+  const name = opts.title || book.name;
+  const head = [name];
+  if (opts.author) head.push('作者：' + opts.author);
+  head.push('');
+  if (opts.withTocPage) head.push('目 录', '', ...chapters.map((_, i) => titleOf(i + 1)), '', '='.repeat(30), '');
+
+  function titleOf(n){
+    const k = n - 1 - offset;
+    return (k >= 0 && k < titles.length) ? titles[k] : '第' + n + '章';
+  }
+
+  const body = [];
+  let chars = 0;
+  for (let i = 0; i < chapters.length; i++){
+    body.push(titleOf(i + 1), '', chapters[i], '');
+    chars += chapters[i].replace(/[\s\u3000]/g, '').length;
+  }
+  const note = '（本文件由「阅读」(Legado) 缓存章节整理，共 ' + chapters.length +
+               ' 章，约 ' + (chars / 10000).toFixed(1) + ' 万字）';
+  return { name, text: head.concat(body, [note]).join('\n') + '\n',
+           chapters: chapters.length, chars, titles: chapters.map((_, i) => titleOf(i + 1)) };
+}
+
+/* ---------------- 下载 ---------------- */
+function download(filename, text, asZipEntries){
+  let blob;
+  if (asZipEntries) blob = makeZip(asZipEntries);
+  else blob = new Blob(['\uFEFF' + text], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
+}
+
+/* 打包成 zip（store 模式，不压缩；单章文件在手机上一个个下载太麻烦） */
+let CRC_TABLE = null;
+function crcTable(){
+  if (CRC_TABLE) return CRC_TABLE;
+  CRC_TABLE = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    CRC_TABLE[n] = c >>> 0;
+  }
+  return CRC_TABLE;
+}
+function crc32(bytes){
+  const t = crcTable();
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = t[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function makeZip(files){
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files){
+    const nb = enc.encode(f.name);
+    const data = enc.encode('\uFEFF' + f.text);
+    const crc = crc32(data);
+    const lh = new Uint8Array(30 + nb.length);
+    const d1 = new DataView(lh.buffer);
+    d1.setUint32(0, 0x04034b50, true); d1.setUint16(4, 20, true);
+    d1.setUint16(6, 0x800, true); d1.setUint16(8, 0, true);
+    d1.setUint32(14, crc, true);
+    d1.setUint32(18, data.length, true); d1.setUint32(22, data.length, true);
+    d1.setUint16(26, nb.length, true);
+    lh.set(nb, 30);
+    parts.push(lh, data);
+
+    const ch = new Uint8Array(46 + nb.length);
+    const d2 = new DataView(ch.buffer);
+    d2.setUint32(0, 0x02014b50, true); d2.setUint16(4, 20, true); d2.setUint16(6, 20, true);
+    d2.setUint16(8, 0x800, true); d2.setUint16(10, 0, true);
+    d2.setUint32(16, crc, true);
+    d2.setUint32(20, data.length, true); d2.setUint32(24, data.length, true);
+    d2.setUint16(28, nb.length, true);
+    d2.setUint32(42, offset, true);
+    ch.set(nb, 46);
+    central.push(ch);
+    offset += lh.length + data.length;
+  }
+  const cdSize = central.reduce((s, c) => s + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const d3 = new DataView(eocd.buffer);
+  d3.setUint32(0, 0x06054b50, true);
+  d3.setUint16(8, files.length, true); d3.setUint16(10, files.length, true);
+  d3.setUint32(12, cdSize, true); d3.setUint32(16, offset, true);
+  return new Blob(parts.concat(central, [eocd]), {type: 'application/zip'});
+}
+
+/* ---------------- 主流程 ---------------- */
+let pickedFiles = [];
+
+function refreshPicked(){
+  const box = $('picked');
+  box.innerHTML = '';
+  const zips = pickedFiles.filter(f => /\.zip$/i.test(f.name));
+  const nbs  = pickedFiles.filter(f => /\.nb$/i.test(f.name));
+  const names = zips.length ? zips.map(f => f.name) : nbs.length ? ['（' + nbs.length + ' 个 .nb 章节文件）'] : [];
+  names.forEach(n => {
+    const s = document.createElement('span');
+    s.className = 'tag'; s.textContent = n;
+    box.appendChild(s);
+  });
+  if (nbs.length && !zips.length) box.insertAdjacentHTML('beforeend',
+    '<div class="hint">已按文件夹分组转换，书名会从路径里推断。</div>');
+  $('go').disabled = !names.length;
+}
+
+function pick(files){
+  pickedFiles = Array.from(files || []);
+  refreshPicked();
+}
+
+$('drop').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => pick(e.target.files));
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => {
+  e.preventDefault(); $('drop').classList.add('on');
+}));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => {
+  e.preventDefault(); if (t === 'drop' && e.dataTransfer) pick(e.dataTransfer.files);
+  $('drop').classList.remove('on');
+}));
+
+/* 能力探测 */
+(function(){
+  const cap = $('cap');
+  if (typeof DecompressionStream === 'undefined'){
+    cap.innerHTML = '<span class="err">当前浏览器不支持解压所需的能力，请用较新的 Chrome / Edge / Safari 打开。</span>';
+    $('go').disabled = true;
+    return;
+  }
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.isSecureContext){
+    cap.innerHTML = '<span class="warn" style="color:var(--warn)">建议用 Chrome / Edge 打开，部分手机浏览器不允许下载生成的文件。</span>';
+  }
+})();
+
+$('go').addEventListener('click', async () => {
+  const btn = $('go');
+  btn.disabled = true; btn.textContent = '转换中…';
+  $('log').textContent = ''; $('res').style.display = 'none';
+  progress(0);
+  try {
+    /* 1. 标题清单 */
+    let titles = [];
+    const pasted = $('tocText').value.trim();
+    if (pasted){
+      titles = parseTitles(pasted, /<a\s/i.test(pasted));
+      log('标题清单：粘贴内容里读到 ' + titles.length + ' 条');
+    }
+    const tf = $('tocFile').files[0];
+    if (!titles.length && tf){
+      const isHtml = /\.html?$/i.test(tf.name);
+      titles = parseTitles(await tf.text(), isHtml);
+      log('标题清单：文件里读到 ' + titles.length + ' 条');
+    }
+    if (!titles.length) log('没有标题清单，章节标题将显示为「第N章」（不影响阅读）');
+
+    /* 2. 取章节 */
+    const zips = pickedFiles.filter(f => /\.zip$/i.test(f.name));
+    let books = [];
+    if (zips.length){
+      for (let i = 0; i < zips.length; i++){
+        const f = zips[i];
+        log('\n解压 ' + f.name + ' （' + (f.size / 1048576).toFixed(2) + ' MB）');
+        const one = await unzipToChapters(await f.arrayBuffer(), f.name);
+        one.forEach(b => log('  发现《' + b.name + '》 ' + b.chapters.length + ' 章'));
+        books = books.concat(one);
+      }
+    } else {
+      books = await filesToChapters(pickedFiles);
+      books.forEach(b => log('《' + b.name + '》 ' + b.chapters.length + ' 章'));
+    }
+    if (!books.length) throw new Error('没有解析出任何章节');
+
+    /* 3. 生成文本 */
+    progress(0.95);
+    const opts = {
+      title: $('title').value.trim(),
+      author: $('author').value.trim(),
+      withTocPage: $('withToc').checked
+    };
+    const resBody = $('resBody');
+    resBody.innerHTML = '';
+    for (const b of books){
+      const r = buildText(b, titles, opts);
+      log('\n《' + r.name + '》：' + r.chapters + ' 章，正文约 ' + r.chars.toLocaleString() + ' 字');
+      const fname = r.chapters > 1
+        ? r.name + '（1-' + r.chapters + '章）.txt'
+        : r.name + '.txt';
+      const card = document.createElement('div');
+      card.style.marginBottom = '16px';
+      card.innerHTML = '<h3>《' + r.name + '》</h3>' +
+        '<p class="meta">' + r.chapters + ' 章 · 约 ' + (r.chars / 10000).toFixed(1) + ' 万字</p>';
+      const btns = document.createElement('div');
+      btns.className = 'btns';
+
+      const b1 = document.createElement('button');
+      b1.textContent = '下载分章 txt';
+      b1.onclick = () => download(fname, r.text);
+      btns.appendChild(b1);
+
+      const singles = r.chapters > 1 ? r.titles.map((t, i) => ({
+        name: String(i + 1).padStart(3, '0') + ' ' +
+              t.replace(/^第[0-9一二三四五六七八九十百零]+章[\s\u3000]*/, '').replace(/[\\/:*?"<>|]/g, '_') + '.txt',
+        text: t + '\n\n' + b.chapters[i] + '\n'
+      })) : null;
+      if (singles){
+        const b2 = document.createElement('button');
+        b2.className = 'ghost';
+        b2.textContent = '下载单章 zip（' + r.chapters + ' 个）';
+        b2.onclick = () => download(r.name + '_单章文稿.zip', null, singles);
+        btns.appendChild(b2);
+      }
+      card.appendChild(btns);
+      resBody.appendChild(card);
+    }
+    progress(1);
+    $('res').style.display = 'block';
+    log('\n完成。');
+    $('res').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  } catch (err){
+    console.error(err);
+    log('\n转换失败：' + (err && err.message ? err.message : err));
+  } finally {
+    btn.disabled = false; btn.textContent = '开始转换';
+  }
+});
+
+refreshPicked();
+</script>
+</body>
+</html>
