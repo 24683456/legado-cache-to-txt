@@ -18,14 +18,21 @@
 
 ---
 
-## 方案 1：Fork 后开启 Pages（推荐，约 30 秒）
+## 方案 1：一键建仓 + 开启 Pages（推荐，约 30 秒）
 
-1. 打开 https://github.com/24683456/legado-cache-to-txt ，点右上角 **Fork** → **Create fork**
-2. 进**你自己**的这个仓库 → **Settings** → 左侧菜单 **Pages**
-3. **Source** 选 `Deploy from a branch`；**Branch** 选 `main`，目录选 `/(root)` → **Save**
-4. 等 1~2 分钟，访问 `https://<你的用户名>.github.io/legado-cache-to-txt/`
+这个仓库已开启**模板仓库**，所以有两种同样简单的起点：
 
-> ⚠️ Fork 出来的仓库，Pages 默认是**关闭**的，必须自己去 Settings 里开一次。
+- **用模板**（推荐）：仓库页面右上角 **Use this template** → **Create a new repository**
+  → 起个名字 → Create。这样得到的是一份干净的独立仓库，不带 fork 关系
+- **或者 Fork**：点右上角 **Fork** → **Create fork**
+
+拿到自己的仓库后（两种方式步骤相同）：
+
+1. 进**你自己**的仓库 → **Settings** → 左侧菜单 **Pages**
+2. **Source** 选 `Deploy from a branch`；**Branch** 选 `main`，目录选 `/(root)` → **Save**
+3. 等 1~2 分钟，访问 `https://<你的用户名>.github.io/<仓库名>/`
+
+> ⚠️ 新建 / Fork 出来的仓库，Pages 默认是**关闭**的，必须自己去 Settings 里开一次。
 
 ---
 
